@@ -1,0 +1,273 @@
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+
+	<title>Test</title>
+
+	<style type="text/css">
+		body {
+			font-family: "Courier";
+		}
+
+		.input {
+			width: 100%;
+			height: 230px;
+			resize: none;
+		}
+
+		#page_content_table {
+			width: 100%;
+			height: 100%;
+		}
+
+		#rom_data_container, #ram_data_container, #emulator_state_container {
+			width: 100%;
+			height: 400px;
+			overflow: auto;
+			display: inline-block;
+		}
+
+		#rom_data, #ram_data, #emulator_state_data {
+			width: 100%;
+			border-spacing: 0 1px;
+			background-color: #F5F5F5;
+		}
+
+		.rom_coloumn_width, .emulator_coloumn_width {
+			width: 300px;
+		}
+
+		.rom_data_row, .emulator_data_row {
+			font-size: 12px;
+		}
+
+		.rom_data_cell_index, .emulator_data_cell_key {
+			width: 40px;
+			font-weight: bold;
+			background-color: #212121;
+			color: #FAFAFA;
+			padding: 4px;
+		}
+
+		.rom_data_cell_value, .emulator_data_cell_value {
+			width: 180px;
+			background-color: #F5F5F5;
+			padding: 4px;
+		}
+
+		.emulator_data_cell_key {
+			width: 100px;
+			padding: 5px;
+		}
+
+		.emulator_data_cell_value {
+			width: 300px;
+			padding: 5px;
+		}
+
+		.emulator_control_button {
+			width: 75px;
+		}
+
+	</style>
+	<script type="text/javascript">
+		function flashRom() {
+			var program = null;
+			try {
+				program = JSON.parse(document.getElementById("program_input").value);
+			} catch (e) {
+				document.getElementById("program_input").style.backgroundColor = "#FFCCBC";
+				return false;
+			}
+
+			rom.flash(program);
+			document.getElementById("program_input").style.backgroundColor = "#DCEDC8";
+			updateMemoryDataTable(rom.readBytes(0, rom.getSize()), "rom_data");
+			
+
+			return true;
+		}
+
+		function loadRam() {
+			var data = null;
+			try {
+				data = JSON.parse(document.getElementById("data_input").value);
+			} catch (e) {
+				document.getElementById("data_input").style.backgroundColor = "#FFCCBC";
+				return false;
+			}
+
+			ram.writeBytes(0, data);
+			document.getElementById("data_input").style.backgroundColor = "#DCEDC8";
+			updateMemoryDataTable(ram.readBytes(0, ram.getSize()), "ram_data");
+
+			return true;
+		}
+
+		function updateMemoryDataTable(program, tableId) {
+			if(program.length % 2 > 0) {
+				program.push(0);
+			}
+
+			document.getElementById(tableId).innerHTML = "";
+
+			var div = document.createElement("div");
+			for(var i = 0; i < program.length; i += 2) {
+				var tr_rom_data = document.createElement("tr");
+				tr_rom_data.setAttribute("class", "rom_data_row");
+
+				var td_index = document.createElement("td");
+				td_index.setAttribute("class", "rom_data_cell_index");
+				td_index.setAttribute("align", "center");
+				td_index.innerHTML = (i).toString(16);
+				tr_rom_data.appendChild(td_index);
+
+				var td_value = document.createElement("td");
+				td_value.setAttribute("class", "rom_data_cell_value");
+				td_value.setAttribute("align", "center");
+				td_value.innerHTML = ("00000000" + program[i].toString(2)).slice(-8);
+				tr_rom_data.appendChild(td_value);
+
+				var td_value = document.createElement("td");
+				td_value.setAttribute("class", "rom_data_cell_value");
+				td_value.setAttribute("align", "center");
+				td_value.innerHTML = ("00000000" + program[i + 1].toString(2)).slice(-8);
+				tr_rom_data.appendChild(td_value);
+
+				div.appendChild(tr_rom_data);
+			}
+
+			document.getElementById(tableId).appendChild(div);
+		}
+
+		function updateEmulatorStateTable(state) {
+			document.getElementById("emulator_state_data").innerHTML = "";
+			var div = document.createElement("div");
+
+			var keys = Object.keys(state);
+			for(var i = 0; i < keys.length; i++) {
+				var tr_emulator_data = document.createElement("tr");
+				tr_emulator_data.setAttribute("class", "emulator_data_row");
+
+				var td_key = document.createElement("td");
+				td_key.setAttribute("class", "emulator_data_cell_key");
+				td_key.setAttribute("align", "center");
+				td_key.innerHTML = keys[i];
+				tr_emulator_data.appendChild(td_key);
+
+				var td_value = document.createElement("td");
+				td_value.setAttribute("class", "emulator_data_cell_value");
+				td_value.setAttribute("align", "center");
+				td_value.innerHTML =state[keys[i]];
+				tr_emulator_data.appendChild(td_value);
+
+				div.appendChild(tr_emulator_data);
+			}
+
+			document.getElementById("emulator_state_data").appendChild(div);
+		}
+
+		function updateEmulatorState(path, cpuState) {
+			console.log("update");
+			updateMemoryDataTable(rom.readBytes(0, rom.getSize()), "rom_data");
+			updateMemoryDataTable(ram.readBytes(0, ram.getSize()), "ram_data");
+			updateEmulatorStateTable(cpuState);
+		}
+
+		function startEmulator() {
+			oscillator.on();
+		}
+
+		function pauseEmulator() {
+			oscillator.off();
+		}
+
+		function resetEmulator() {
+			cpu.reset();
+		}
+
+		function pulseEnulator() {
+			cpu.update("cpu", {});
+		}
+
+		window.onload = function() {
+			updateMemoryDataTable([], "rom_data");
+			updateMemoryDataTable([], "ram_data");
+			updateEmulatorState("view", {
+				CMD: "",
+				CARRY_BIT: false,
+				A: 255,
+				B: 255,
+				R0: 255,
+				R1: 255,
+				TEMP: 255,
+				state: "",
+				pc: 0,
+				port: 0,
+			});
+
+			cpu.addObserver("view", {
+				update: updateEmulatorState
+			});
+		}
+	</script>
+</head>
+
+<body>
+	<script type="text/javascript" src="dist/bundle.js"></script>
+	<table id="page_content_table">
+		<tr>
+			<td class="rom_coloumn_width" style="font-size: 12px;" align="center">
+				Rom data
+			</td>
+			<td class="rom_coloumn_width" style="font-size: 12px;" align="center">
+				Ram data
+			</td>
+			<td class="rom_coloumn_width" style="font-size: 12px;" align="center">
+				Emulator state
+			</td>
+		</tr>
+		<tr>
+			<td class="rom_coloumn_width">
+				<div id="rom_data_container">
+					<table id="rom_data"></table>
+				</div>
+			</td>
+			<td class="rom_coloumn_width">
+				<div id="ram_data_container">
+					<table id="ram_data"></table>
+				</div>
+			</td>
+			<td class="emulator_coloumn_width">
+				<div id="emulator_state_container">
+					<table id="emulator_state_data"></table>
+				</div>
+			</td>
+		</tr>
+		<tr>
+			<td class="rom_coloumn_width">
+				<textarea id="program_input" class="input"></textarea>
+			</td>
+			<td class="rom_coloumn_width">
+				<textarea id="data_input" class="input"></textarea>
+			</td>
+			<td class="rom_coloumn_width">
+				<button class="emulator_control_button" onclick="startEmulator()">Start</button>
+				<button class="emulator_control_button" onclick="pauseEmulator()">Pause</button>
+				<button class="emulator_control_button" onclick="resetEmulator()">Reset</button>
+				<button class="emulator_control_button" onclick="pulseEnulator()">Pulse</button>
+			</td>
+		</tr>
+		<tr>
+			<td class="rom_coloumn_width">
+				<button id="flash_rom" onclick="flashRom()">Flash ROM</button>
+				<button id="snap_rom">Snap ROM</button>
+			</td>
+			<td class="rom_coloumn_width">
+				<button id="load_ram" onclick="loadRam()">Load RAM</button>
+				<button id="snap_ram" onclick="">Snap RAM</button>
+			</td>
+		</tr>
+	</table>
+</body>
+</html>
